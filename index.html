@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HOBBY.SYS — five games built from nothing</title>
-<meta name="description" content="Five browser games, hand-built in vanilla JavaScript. No engines, no assets, no build step. Everything — textures, sound, worlds — generated in code.">
+<title>HOBBY.SYS — six games built from (almost) nothing</title>
+<meta name="description" content="Six browser games, hand-built in JavaScript. No engines, no assets, no build step. Everything — textures, sound, worlds — generated in code.">
 <style>
   :root {
     --void: #0a0a0d;
@@ -274,10 +274,10 @@
   <header>
     <div class="boot" id="boot" aria-hidden="true"></div>
     <h1>HOBBY<span class="sys">.SYS</span></h1>
-    <p class="tag">Five games for the browser, built by hand in vanilla JavaScript over one long week. <b>No engines. No frameworks. No image or audio files. No build step.</b> Every texture, every sound, every world is generated in code the moment the page loads.</p>
+    <p class="tag">Six games for the browser, built by hand in JavaScript over one weekend. <b>No engines. No frameworks. No image or audio files. No build step.</b> Every texture, every sound, every world is generated in code the moment the page loads. The newest one bends a single rule — it vendors Three.js — and makes everything else itself.</p>
     <div class="creed">
       <span>0 assets</span>
-      <span>0 dependencies</span>
+      <span>1 dependency, vendored, reluctantly</span>
       <span>&lt;canvas&gt; + WebGL + WebAudio</span>
       <span>view-source and see</span>
     </div>
@@ -292,7 +292,7 @@
     Built with Claude Code. Source is public: read it, fork it, break it.</p>
     <p style="margin-top:10px">
       <a href="https://github.com/awasthy7/hobby" id="repo-link">github.com/…/hobby</a>
-      &nbsp;·&nbsp; a raycaster, a fighting game, a fluid sim, a literary game, and a philosopher's loop.
+      &nbsp;·&nbsp; a combat racer, a raycaster, a fighting game, a fluid sim, a literary game, and a philosopher's loop.
     </p>
   </footer>
 </div>
@@ -310,7 +310,7 @@
     ["checking webaudio .......... PRESENT", "ok"],
     ["checking webrtc ............ PRESENT", "ok"],
     ["loading assets ............ 0 found  (none needed)", ""],
-    ["mounting /games ........... 5 titles", ""],
+    ["mounting /games ........... 6 titles", ""],
   ];
   const bootEl = document.getElementById("boot");
   if (reduced) {
@@ -340,6 +340,13 @@
 
   // ---------- game data ----------
   const GAMES = [
+    {
+      dir: "roadwrath", title: "ROAD WRATH", kind: "combat racer", accent: "#f5b642",
+      desc: "A Road Rash-style motorcycle combat racer in true 3D. Punch, kick, and club seven <em>grudge-holding rivals</em> through five levels of golden-hour California — two-way traffic, cops, wipeouts you run back from, a bike shop, and a fully <em>synthesized synthwave-rock soundtrack</em>. The one game here that allows itself a library: Three.js, pinned and vendored.",
+      stats: ["5 levels × 3 races", "7 rivals with grudges", "procedural soundtrack", "keyboard + gamepad"],
+      links: [["roadwrath/index.html", "RIDE", true]],
+      render: roadThumb,
+    },
     {
       dir: "doom", title: "DOOMED", kind: "raycaster fps", accent: "#e83a28",
       desc: "A full DOOM in a canvas — sector geometry you can jump and crouch through, a <em>WebGL renderer</em> with per-pixel lighting and bloom, seven monsters that turn on each other, six weapons, an eight-map campaign with bosses, seeded endless mode, a level editor whose links are the maps, and <em>peer-to-peer co-op &amp; deathmatch</em> with no server.",
@@ -405,6 +412,58 @@
   }
 
   // ---------- generative thumbnails (zero assets, in keeping) ----------
+  // road wrath — pseudo-3D sunset highway
+  function roadThumb(g, W, H, t) {
+    const horizon = H * 0.55;
+    const sky = g.createLinearGradient(0, 0, 0, horizon);
+    sky.addColorStop(0, "#241c4e"); sky.addColorStop(0.65, "#c8503a"); sky.addColorStop(1, "#f5a04a");
+    g.fillStyle = sky; g.fillRect(0, 0, W, horizon);
+    // sun with glow
+    g.fillStyle = "rgba(255,190,120,0.28)";
+    g.beginPath(); g.arc(W * 0.5, horizon - H * 0.12, W * 0.19, 0, 7); g.fill();
+    g.fillStyle = "#ffd9a0";
+    g.beginPath(); g.arc(W * 0.5, horizon - H * 0.12, W * 0.11, 0, 7); g.fill();
+    // ground + road trapezoid
+    g.fillStyle = "#33241f"; g.fillRect(0, horizon, W, H - horizon);
+    const vx = W * 0.5;
+    g.fillStyle = "#1d1a20";
+    g.beginPath(); g.moveTo(vx - 2, horizon); g.lineTo(W * 0.1, H); g.lineTo(W * 0.9, H); g.lineTo(vx + 2, horizon); g.closePath(); g.fill();
+    // scrolling perspective center dashes
+    g.strokeStyle = "#f5b642";
+    for (let i = 0; i < 10; i++) {
+      const z = (i * 0.11 + t * 0.5) % 1.1;
+      const y0 = horizon + z * z * (H - horizon);
+      const y1 = horizon + Math.min(1.1, z + 0.045) ** 2 * (H - horizon);
+      if (y1 - y0 < 0.6) continue;
+      g.globalAlpha = Math.min(1, z * 2.5);
+      g.lineWidth = 0.5 + z * 2.6;
+      g.beginPath(); g.moveTo(vx, y0); g.lineTo(vx, y1); g.stroke();
+    }
+    g.globalAlpha = 1;
+    // palm silhouettes
+    g.fillStyle = "#160f14";
+    for (const sx of [0.13, 0.87]) {
+      const px = W * sx, py = horizon + 2;
+      g.fillRect(px - 1, py - 14, 2.5, 14);
+      for (let a = 0; a < 5; a++) {
+        g.beginPath(); g.ellipse(px + Math.cos(a * 1.3 + sx * 9) * 5, py - 15, 5.5, 1.6, a * 1.3 + Math.sin(t + sx) * 0.08, 0, 7); g.fill();
+      }
+    }
+    // rider silhouette, weaving
+    const bx = W * 0.5 + Math.sin(t * 1.6) * W * 0.06, by = H * 0.87, lean = Math.cos(t * 1.6) * 0.3;
+    g.save(); g.translate(bx, by); g.rotate(lean);
+    g.fillStyle = "#0b0b10";
+    g.beginPath(); g.arc(-5, 5, 4.4, 0, 7); g.fill();       // rear wheel
+    g.beginPath(); g.arc(6, 5, 4.4, 0, 7); g.fill();        // front wheel
+    g.fillRect(-6, -3, 12, 6);                               // frame
+    g.beginPath(); g.moveTo(-4, -3); g.lineTo(1, -10); g.lineTo(5, -3); g.closePath(); g.fill(); // rider
+    g.beginPath(); g.arc(1, -12, 3, 0, 7); g.fill();         // helmet
+    g.restore();
+    // taillight streak
+    g.fillStyle = "rgba(232,58,40,0.55)";
+    g.fillRect(bx - 7 + Math.sin(t * 1.6) * 2, by + 1, 3, 1.6);
+  }
+
   // DOOM fire
   const firebuf = new Uint8Array(64 * 40).fill(0);
   const firePal = [[7,7,7],[47,15,7],[87,23,7],[119,31,7],[143,39,7],[175,63,7],[199,71,7],[223,87,7],[215,95,7],[207,111,15],[207,127,15],[199,143,23],[191,159,31],[191,175,47],[207,207,111],[239,239,199],[255,255,255]];
