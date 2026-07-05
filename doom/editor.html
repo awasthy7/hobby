@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DOOMED — level editor</title>
+<style>
+  html, body { margin: 0; background: #100c0c; color: #d8cdb8; font: 13px/1.4 monospace; }
+  #wrap { display: flex; gap: 12px; padding: 12px; align-items: flex-start; }
+  #tools { width: 190px; display: flex; flex-wrap: wrap; gap: 4px; }
+  #tools button {
+    background: #241e1a; color: #cfc4ae; border: 1px solid #4a4038;
+    font: 11px monospace; padding: 4px 6px; cursor: pointer; flex: 1 0 40%;
+  }
+  #tools button.sel { background: #7a2a1a; color: #ffe8c8; border-color: #c8502a; }
+  #tools h4 { width: 100%; margin: 8px 0 2px; color: #8a7c64; font-size: 11px; }
+  canvas { image-rendering: pixelated; border: 1px solid #4a4038; cursor: crosshair; }
+  #bar { margin-top: 8px; display: flex; gap: 8px; align-items: center; }
+  #bar button { background: #35502a; color: #e0f0d0; border: 1px solid #6a9a4a; font: bold 13px monospace; padding: 8px 16px; cursor: pointer; }
+  #bar button.warn { background: #502a2a; border-color: #9a4a4a; color: #f0d0d0; }
+  #name { background: #1a1512; border: 1px solid #4a4038; color: #ffe8c8; font: 13px monospace; padding: 6px; }
+  #msg { color: #e8a848; min-height: 18px; }
+  #share { width: 100%; background: #14100e; color: #9a8c74; border: 1px solid #3a322a; font: 10px monospace; margin-top: 6px; }
+  h1 { font-size: 16px; margin: 12px 12px 0; color: #e8552a; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+<h1>DOOMED · LEVEL EDITOR</h1>
+<div id="wrap">
+  <div id="tools"></div>
+  <div>
+    <canvas id="grid" width="672" height="528"></canvas>
+    <div id="bar">
+      <input id="name" value="MY MAP" maxlength="18">
+      <button id="play">▶ PLAY</button>
+      <button id="share" style="display:none"></button><button id="copy">SHARE URL</button>
+      <button id="clear" class="warn">WIPE</button>
+    </div>
+    <div id="msg">left-drag paint · right-drag erase to rock · one PLAYER and one EXIT required</div>
+    <textarea id="shareout" rows="3" style="width:672px" readonly placeholder="share URL appears here"></textarea>
+  </div>
+</div>
+<script src="js/util.js"></script>
+<script src="js/tex.js"></script>
+<script src="js/maps.js"></script>
+<script src="js/editor.js"></script>
+</body>
+</html>

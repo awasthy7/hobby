@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HOBBY.SYS — five games built from nothing</title>
+<meta name="description" content="Five browser games, hand-built in vanilla JavaScript. No engines, no assets, no build step. Everything — textures, sound, worlds — generated in code.">
+<style>
+  :root {
+    --void: #0a0a0d;
+    --panel: #12100f;
+    --panel-hi: #1a1714;
+    --bone: #e8e2d4;
+    --bone-dim: #b8b0a0;
+    --label: #8a7c64;
+    --sys: #6a8a6e;
+    --hell: #e83a28;
+    --line: #2a2622;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    background: var(--void);
+    color: var(--bone);
+    font: 15px/1.6 ui-monospace, "Cascadia Code", "Menlo", "Consolas", monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    /* faint scanlines over the whole page */
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        rgba(0,0,0,0) 0px,
+        rgba(0,0,0,0) 2px,
+        rgba(0,0,0,0.14) 3px,
+        rgba(0,0,0,0) 4px
+      );
+    background-attachment: fixed;
+  }
+
+  ::selection { background: var(--hell); color: #fff; }
+
+  .wrap {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: clamp(24px, 5vw, 64px) clamp(16px, 4vw, 40px) 80px;
+  }
+
+  /* ---------- boot header ---------- */
+  header {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 28px;
+    margin-bottom: 8px;
+  }
+
+  .boot {
+    color: var(--sys);
+    font-size: 12.5px;
+    line-height: 1.9;
+    letter-spacing: 0.02em;
+    min-height: 90px;
+    white-space: pre-wrap;
+  }
+  .boot .ok { color: var(--bone-dim); }
+  .cursor {
+    display: inline-block;
+    width: 8px;
+    height: 15px;
+    background: var(--sys);
+    vertical-align: -2px;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  h1 {
+    font-size: clamp(38px, 9vw, 88px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 0.92;
+    margin: 26px 0 10px;
+    text-wrap: balance;
+    color: var(--bone);
+  }
+  h1 .sys { color: var(--hell); }
+
+  .tag {
+    color: var(--label);
+    font-size: clamp(13px, 2.4vw, 16px);
+    max-width: 60ch;
+    line-height: 1.55;
+  }
+  .tag b { color: var(--bone-dim); font-weight: 400; }
+
+  .creed {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-top: 20px;
+  }
+  .creed span {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sys);
+    border: 1px solid var(--line);
+    padding: 4px 9px;
+    border-radius: 2px;
+  }
+
+  /* ---------- directory listing ---------- */
+  .listing-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin: 44px 2px 14px;
+    color: var(--label);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .listing-head::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  .games {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .game {
+    display: grid;
+    grid-template-columns: 132px 1fr;
+    gap: 0;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+    transition: border-color 0.18s, transform 0.18s;
+    position: relative;
+  }
+  .game::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    opacity: 0.9;
+  }
+  .game:hover {
+    border-color: var(--accent);
+    transform: translateX(3px);
+  }
+
+  .thumb {
+    position: relative;
+    background: #060608;
+    border-right: 1px solid var(--line);
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+  }
+  .thumb canvas { display: block; width: 100%; height: 100%; }
+
+  .meta {
+    padding: 16px 20px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+  .titleline {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .game h2 {
+    font-size: clamp(20px, 3.4vw, 27px);
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .kind {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--label);
+  }
+  .desc {
+    color: var(--bone-dim);
+    font-size: 13.5px;
+    line-height: 1.5;
+    max-width: 66ch;
+  }
+  .desc em { color: var(--bone); font-style: normal; }
+
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--sys);
+    margin-top: 2px;
+  }
+  .stats span::before { content: "· "; color: var(--line); }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .links a {
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--bone);
+    background: var(--panel-hi);
+    border: 1px solid var(--line);
+    padding: 7px 14px;
+    border-radius: 2px;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .links a.play {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  }
+  .links a:hover {
+    background: var(--accent);
+    color: #0a0a0d;
+    border-color: var(--accent);
+  }
+  .links a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ---------- footer ---------- */
+  footer {
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    color: var(--label);
+    font-size: 12.5px;
+    line-height: 1.7;
+  }
+  footer a { color: var(--sys); text-decoration: none; border-bottom: 1px solid transparent; }
+  footer a:hover { border-bottom-color: var(--sys); }
+  footer .prompt { color: var(--hell); }
+
+  @media (max-width: 560px) {
+    .game { grid-template-columns: 92px 1fr; }
+    .meta { padding: 13px 15px 15px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cursor { animation: none; }
+    .game { transition: border-color 0.18s; }
+    .game:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="boot" id="boot" aria-hidden="true"></div>
+    <h1>HOBBY<span class="sys">.SYS</span></h1>
+    <p class="tag">Five games for the browser, built by hand in vanilla JavaScript over one long week. <b>No engines. No frameworks. No image or audio files. No build step.</b> Every texture, every sound, every world is generated in code the moment the page loads.</p>
+    <div class="creed">
+      <span>0 assets</span>
+      <span>0 dependencies</span>
+      <span>&lt;canvas&gt; + WebGL + WebAudio</span>
+      <span>view-source and see</span>
+    </div>
+  </header>
+
+  <div class="listing-head">dir /games</div>
+
+  <main class="games" id="games"></main>
+
+  <footer>
+    <p>All five run from any static file server — clone the repo and open a page, or press <span class="prompt">▶</span> above.
+    Built with Claude Code. Source is public: read it, fork it, break it.</p>
+    <p style="margin-top:10px">
+      <a href="https://github.com/awasthy7/hobby" id="repo-link">github.com/…/hobby</a>
+      &nbsp;·&nbsp; a raycaster, a fighting game, a fluid sim, a literary game, and a philosopher's loop.
+    </p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------- boot sequence ----------
+  const bootLines = [
+    ["HOBBY.SYS v1.0 — cold boot", "ok"],
+    ["checking canvas2d .......... PRESENT", "ok"],
+    ["checking webgl2 ............ PRESENT", "ok"],
+    ["checking webaudio .......... PRESENT", "ok"],
+    ["checking webrtc ............ PRESENT", "ok"],
+    ["loading assets ............ 0 found  (none needed)", ""],
+    ["mounting /games ........... 5 titles", ""],
+  ];
+  const bootEl = document.getElementById("boot");
+  if (reduced) {
+    bootEl.textContent = bootLines.map(l => l[0]).join("\n") + "\n> ready_";
+  } else {
+    let li = 0, ci = 0, out = "";
+    const tick = () => {
+      if (li >= bootLines.length) {
+        bootEl.innerHTML = out + '<span style="color:var(--hell)">&gt; ready_</span> <span class="cursor"></span>';
+        return;
+      }
+      const line = bootLines[li][0];
+      if (ci < line.length) {
+        out += line[ci++];
+        bootEl.textContent = out;
+        setTimeout(tick, 6 + Math.random() * 10);
+      } else {
+        const cls = bootLines[li][1] === "ok" ? ' <span class="ok">[ done ]</span>' : "";
+        out += cls + "\n";
+        li++; ci = 0;
+        bootEl.innerHTML = out;
+        setTimeout(tick, 55);
+      }
+    };
+    tick();
+  }
+
+  // ---------- game data ----------
+  const GAMES = [
+    {
+      dir: "doom", title: "DOOMED", kind: "raycaster fps", accent: "#e83a28",
+      desc: "A full DOOM in a canvas — sector geometry you can jump and crouch through, a <em>WebGL renderer</em> with per-pixel lighting and bloom, seven monsters that turn on each other, six weapons, an eight-map campaign with bosses, seeded endless mode, a level editor whose links are the maps, and <em>peer-to-peer co-op &amp; deathmatch</em> with no server.",
+      stats: ["8 maps + secret", "endless mode", "co-op / DM", "level editor"],
+      links: [["index.html", "PLAY", true], ["editor.html", "EDITOR", false]],
+      render: fireThumb,
+    },
+    {
+      dir: "soundclash", title: "SOUNDCLASH", kind: "rhythm fighter", accent: "#e84aa0",
+      desc: "A Street-Fighter-style versus game where the music <em>is</em> the fight. Land hits on the beat for 1.5× damage and to build your groove meter to a super. Three fighters, three synthesized genres — metal, synthwave, orchestral — each with a music-reactive stage.",
+      stats: ["3 fighters", "beat-judged combat", "local 2P + CPU"],
+      links: [["soundclash/index.html", "PLAY", true]],
+      render: eqThumb,
+    },
+    {
+      dir: "ink", title: "INKWELL", kind: "fluid simulation", accent: "#3ec8e8",
+      desc: "Ink diffusing through still water, following your cursor. A real <em>GPU Navier–Stokes solver</em> — velocity and dye fields, vorticity confinement, pressure projection — running entirely in WebGL shaders. Move to draw threads of color; press to pour.",
+      stats: ["stable-fluids solver", "WebGL shaders", "hover to paint"],
+      links: [["ink/index.html", "OPEN", true]],
+      render: inkThumb,
+    },
+    {
+      dir: "palimpsest", title: "PALIMPSEST", kind: "literary game", accent: "#d8b45a",
+      desc: "A soothing game for writers, in seven folios. It quietly watches how you play — which words you gather, what you water longest, whether you hold on or let go — then at the end writes a <em>personalized poem about you</em>, typed letter by letter, over a galaxy of every word you touched.",
+      stats: ["7 folios", "generative audio", "it writes you a poem"],
+      links: [["palimpsest/index.html", "ENTER", true]],
+      render: riverThumb,
+    },
+    {
+      dir: "amorfati", title: "AMOR FATI", kind: "narrative · philosophy", accent: "#ccc2a8",
+      desc: "A game designed after Nietzsche. You live one short life — the rope, the desert of burdens, the dragon THOU SHALT, the market where God is dead, the abyss that gazes back — then a demon asks if you'd live it all again. Saying <em>no</em> honestly restarts. It remembers every loop.",
+      stats: ["6 chapters", "eternal recurrence", "it remembers"],
+      links: [["amorfati/index.html", "BEGIN", true]],
+      render: recurThumb,
+    },
+  ];
+
+  // ---------- build cards ----------
+  const wrap = document.getElementById("games");
+  const canvases = [];
+  for (const gme of GAMES) {
+    const el = document.createElement("article");
+    el.className = "game";
+    el.style.setProperty("--accent", gme.accent);
+    const cv = document.createElement("canvas");
+    cv.width = 128; cv.height = 128;
+    canvases.push({ cv, render: gme.render, t: Math.random() * 100 });
+    const thumb = document.createElement("div");
+    thumb.className = "thumb";
+    thumb.appendChild(cv);
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.innerHTML =
+      '<div class="titleline"><h2>' + gme.title + '</h2><span class="kind">' + gme.kind + '</span></div>' +
+      '<p class="desc">' + gme.desc + '</p>' +
+      '<div class="stats">' + gme.stats.map(s => "<span>" + s + "</span>").join("") + '</div>' +
+      '<div class="links">' + gme.links.map(l =>
+        '<a href="' + l[0] + '"' + (l[2] ? ' class="play"' : '') + '>' + l[1] + '</a>'
+      ).join("") + '</div>';
+    el.appendChild(thumb);
+    el.appendChild(meta);
+    wrap.appendChild(el);
+  }
+
+  // ---------- generative thumbnails (zero assets, in keeping) ----------
+  // DOOM fire
+  const firebuf = new Uint8Array(64 * 40).fill(0);
+  const firePal = [[7,7,7],[47,15,7],[87,23,7],[119,31,7],[143,39,7],[175,63,7],[199,71,7],[223,87,7],[215,95,7],[207,111,15],[207,127,15],[199,143,23],[191,159,31],[191,175,47],[207,207,111],[239,239,199],[255,255,255]];
+  function fireThumb(g, W, H, t) {
+    for (let x = 0; x < 64; x++) firebuf[(39) * 64 + x] = 16 + (Math.random() * 1 | 0);
+    for (let y = 0; y < 39; y++) for (let x = 0; x < 64; x++) {
+      const s = (y + 1) * 64 + x, v = firebuf[s];
+      const r = (Math.random() * 3) | 0;
+      const d = s - 64 - r + 1;
+      if (d >= 0) firebuf[d] = Math.max(0, v - (r & 1));
+    }
+    const img = g.createImageData(64, 40);
+    for (let i = 0; i < firebuf.length; i++) {
+      const c = firePal[firebuf[i]] || firePal[0];
+      img.data[i*4]=c[0]; img.data[i*4+1]=c[1]; img.data[i*4+2]=c[2]; img.data[i*4+3]=255;
+    }
+    g.imageSmoothingEnabled = false;
+    // draw to an offscreen then scale
+    fireThumb._o = fireThumb._o || (() => { const o = document.createElement("canvas"); o.width=64; o.height=40; return o; })();
+    fireThumb._o.getContext("2d").putImageData(img, 0, 0);
+    g.clearRect(0,0,W,H);
+    g.drawImage(fireThumb._o, 0, H*0.15, W, H*0.85);
+    // silhouette
+    g.fillStyle = "#0b0b12";
+    g.fillRect(W*0.42, H*0.34, W*0.05, H*0.4);
+    g.beginPath(); g.arc(W*0.445, H*0.3, W*0.05, 0, 7); g.fill();
+    g.fillRect(W*0.3, H*0.42, W*0.3, W*0.03);
+  }
+
+  // soundclash equalizer
+  function eqThumb(g, W, H, t) {
+    g.clearRect(0,0,W,H);
+    const grd = g.createLinearGradient(0,0,0,H);
+    grd.addColorStop(0,"#1a0a1e"); grd.addColorStop(1,"#2a0e2a");
+    g.fillStyle = grd; g.fillRect(0,0,W,H);
+    const bars = 11;
+    for (let i = 0; i < bars; i++) {
+      const h = (0.2 + 0.75 * Math.abs(Math.sin(t*2.4 + i*0.7) * Math.cos(t*1.3 + i))) * H * 0.7;
+      const hue = 300 + Math.sin(i*0.5)*30;
+      g.fillStyle = "hsl(" + hue + ",70%," + (45 + (h/H)*25) + "%)";
+      const bw = W/bars;
+      g.fillRect(i*bw + 2, H - h - 6, bw - 4, h);
+    }
+    g.fillStyle = "rgba(232,74,160,0.9)";
+    g.fillRect(0, H-6, W, 2);
+  }
+
+  // ink bloom
+  const inkDrops = [];
+  function inkThumb(g, W, H, t) {
+    if (!inkThumb.init) { g.fillStyle = "#04060a"; g.fillRect(0,0,W,H); inkThumb.init = true; }
+    // fade
+    g.fillStyle = "rgba(4,6,10,0.045)"; g.fillRect(0,0,W,H);
+    if (Math.random() < 0.09 || inkDrops.length === 0) {
+      inkDrops.push({ x: Math.random()*W, y: Math.random()*H, r: 1, hue: 160 + Math.random()*80, life: 1 });
+    }
+    for (const d of inkDrops) {
+      d.r += 0.5; d.life -= 0.012;
+      g.globalAlpha = Math.max(0, d.life) * 0.5;
+      g.strokeStyle = "hsl(" + d.hue + ",80%,60%)";
+      g.lineWidth = 1.4;
+      g.beginPath();
+      for (let a = 0; a < 7; a++) {
+        const wob = Math.sin(a*2 + d.x) * d.r * 0.18;
+        const rr = d.r + wob;
+        const px = d.x + Math.cos(a)*rr, py = d.y + Math.sin(a)*rr;
+        a === 0 ? g.moveTo(px,py) : g.lineTo(px,py);
+      }
+      g.closePath(); g.stroke();
+    }
+    g.globalAlpha = 1;
+    for (let i = inkDrops.length - 1; i >= 0; i--) if (inkDrops[i].life <= 0) inkDrops.splice(i,1);
+  }
+
+  // palimpsest river of words
+  const glyphs = [];
+  function riverThumb(g, W, H, t) {
+    g.fillStyle = "#0c1018"; g.fillRect(0,0,W,H);
+    if (glyphs.length < 14 && Math.random() < 0.14) {
+      glyphs.push({ x: -10, y: 12 + Math.random()*(H-24), s: 0.5 + Math.random()*0.7, v: 6 + Math.random()*10 });
+    }
+    // faint current
+    g.strokeStyle = "rgba(120,140,180,0.12)"; g.lineWidth = 1;
+    for (let i = 0; i < 4; i++) {
+      g.beginPath();
+      for (let x = 0; x <= W; x += 8) g.lineTo(x, H*0.3 + i*H*0.16 + Math.sin(x*0.06 + t + i)*5);
+      g.stroke();
+    }
+    g.textBaseline = "middle";
+    for (const gl of glyphs) {
+      gl.x += gl.v * 0.15;
+      g.globalAlpha = Math.min(1, gl.x/30, (W-gl.x)/30) * 0.9;
+      g.fillStyle = "#d8b45a";
+      g.font = (7 + gl.s*7 | 0) + "px monospace";
+      g.fillText("word", gl.x, gl.y);
+    }
+    g.globalAlpha = 1;
+    for (let i = glyphs.length-1; i>=0; i--) if (glyphs[i].x > W+20) glyphs.splice(i,1);
+  }
+
+  // amor fati — the self-rolling wheel of recurrence
+  function recurThumb(g, W, H, t) {
+    g.fillStyle = "#050408"; g.fillRect(0,0,W,H);
+    g.save();
+    g.translate(W/2, H/2);
+    g.rotate(t*0.4);
+    for (let i = 0; i < 60; i++) {
+      const a = i/60 * Math.PI*2;
+      const rr = W*0.32 + Math.sin(i*0.5 + t)*3;
+      const b = 0.3 + 0.7*Math.abs(Math.sin(a*0.5 + t*0.6));
+      g.fillStyle = "rgba(216,168,86," + (b*0.85) + ")";
+      const s = 1 + b*2.2;
+      g.fillRect(Math.cos(a)*rr - s/2, Math.sin(a)*rr - s/2, s, s);
+    }
+    g.restore();
+    g.fillStyle = "rgba(204,194,168,0.5)";
+    g.font = "italic 9px Georgia, serif";
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText("again", W/2, H/2);
+  }
+
+  // ---------- animate thumbnails (only while on screen) ----------
+  const ctxs = canvases.map(c => ({ g: c.cv.getContext("2d"), render: c.render, t: c.t, on: true }));
+  if (reduced) {
+    // one static frame each
+    ctxs.forEach(c => { for (let k=0;k<40;k++){ c.t+=0.04; c.render(c.g, 128, 128, c.t); } });
+  } else {
+    let raf;
+    const loop = () => {
+      for (const c of ctxs) if (c.on) { c.t += 0.03; c.render(c.g, 128, 128, c.t); }
+      raf = requestAnimationFrame(loop);
+    };
+    // pause when tab hidden to save battery
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) cancelAnimationFrame(raf);
+      else raf = requestAnimationFrame(loop);
+    });
+    loop();
+  }
+})();
+</script>
+</body>
+</html>

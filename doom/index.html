@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DOOMED</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="frame">
+  <div id="stack">
+    <canvas id="glstage" width="960" height="540"></canvas>
+    <canvas id="stage" width="960" height="540"></canvas>
+    <div id="mpui" hidden>
+      <h3>MULTIPLAYER — copy-paste handshake, no servers</h3>
+      <div id="mpstep">Host: pick a mode. Joiner: paste the host's code and press JOIN.</div>
+      <div class="mprow">
+        <button id="mpcoop">HOST CO-OP</button>
+        <button id="mpdm">HOST DEATHMATCH</button>
+        <button id="mpjoin">JOIN WITH CODE</button>
+        <button id="mpaccept" hidden>ACCEPT ANSWER</button>
+        <button id="mpclose">CLOSE</button>
+      </div>
+      <textarea id="mpout" rows="4" readonly placeholder="your code appears here — send it to your friend"></textarea>
+      <textarea id="mpin" rows="4" placeholder="paste their code here"></textarea>
+    </div>
+  </div>
+</div>
+<script src="js/util.js"></script>
+<script src="js/tex.js"></script>
+<script src="js/light.js"></script>
+<script src="js/gl.js"></script>
+<script src="js/net.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/maps.js"></script>
+<script src="js/raycast.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

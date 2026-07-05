@@ -1,0 +1,12 @@
+# Claude Code internal files — not part of the games
+.claude/
+
+# A separate project with its own repo
+govt-assessment-app/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*~
+node_modules/

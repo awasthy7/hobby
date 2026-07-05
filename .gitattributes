@@ -1,0 +1,5 @@
+# Keep text files LF in the repo, however they look on disk
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
