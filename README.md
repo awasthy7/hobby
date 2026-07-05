@@ -1,9 +1,9 @@
 # HOBBY.SYS
 
-Six games for the browser, built by hand in JavaScript over one weekend. **No
-engines. No frameworks. No image or audio files. No build step.** Every texture,
-every sound, every world is generated in code the moment the page opens. (The
-newest game bends one rule: it vendors Three.js. Everything else it makes itself.)
+Five games for the browser, built by hand in vanilla JavaScript over one
+weekend. **No engines. No frameworks. No image or audio files. No build step.**
+Every texture, every sound, every world is generated in code the moment the
+page opens.
 
 **▶ Play them all: https://awasthy7.github.io/hobby/**
 
@@ -12,7 +12,6 @@ server (`npx http-server .`) and visit the games below.
 
 | Game | What it is |
 |------|-----------|
-| **[ROAD WRATH](roadwrath/)** | A Road Rash-style motorcycle combat racer in true 3D — punch, kick, and club seven grudge-holding rivals through five levels of golden-hour California, with two-way traffic, cops, a bike shop, and a fully synthesized synthwave-rock soundtrack. Three.js pinned & vendored in-repo; every mesh, texture, and note still generated in code. [Ride](roadwrath/index.html) |
 | **[DOOMED](doom/)** | A full DOOM in a `<canvas>` — sector geometry with jump/crouch, a WebGL renderer with per-pixel lighting and bloom, seven monster types with infighting, six weapons, an 8-map campaign with phased bosses, seeded endless mode, an in-browser level editor (levels serialize into the URL), and peer-to-peer co-op & deathmatch over WebRTC with no server. [Play](doom/index.html) · [Editor](doom/editor.html) |
 | **[SOUNDCLASH](soundclash/)** | A Street-Fighter-style versus game where the music *is* the fight — hits on the beat do 1.5× damage and build your groove to a super. Three fighters, three synthesized genres, music-reactive stages. [Play](soundclash/index.html) |
 | **[INKWELL](ink/)** | Ink diffusing through water, following your cursor — a real GPU Navier–Stokes fluid solver (velocity + dye fields, vorticity confinement, pressure projection) in WebGL shaders. [Open](ink/index.html) |
@@ -24,9 +23,7 @@ server (`npx http-server .`) and visit the games below.
 Everything is `<canvas>` 2D, WebGL, and WebAudio. Textures and sprites are
 drawn procedurally and baked to pixel buffers; music is scheduled note-by-note
 through the WebAudio graph; DOOMED's renderer raymarches the world on the GPU.
-ROAD WRATH renders with Three.js (the museum's one dependency, pinned and
-vendored in `roadwrath/vendor/`) but builds all of its meshes, textures, and
-music in code. There is no asset pipeline because there are no assets.
+There is no asset pipeline because there are no assets.
 
 Each game folder has its own README with the details.
 
