@@ -4,7 +4,11 @@ D.audio = {
   ctx: null, sfxBus: null, musicBus: null, music: null,
 
   ensure() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    if (this.ctx) {
+      // stay silent while the game is deliberately paused
+      if (this.ctx.state === 'suspended' && !(D.game && D.game.paused)) this.ctx.resume();
+      return;
+    }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     this.ctx = new AC();
@@ -27,13 +31,16 @@ D.audio = {
     const curve = new Float32Array(512);
     for (let i = 0; i < 512; i++) {
       const x = i / 255.5 - 1;
-      curve[i] = Math.tanh(x * 4.5) / Math.tanh(4.5);
+      // gentler drive: crunch without the fizzy top end
+      curve[i] = Math.tanh(x * 3.2) / Math.tanh(3.2);
     }
     shaper.curve = curve;
     shaper.oversample = '2x';
     const tone = this.ctx.createBiquadFilter();
-    tone.type = 'lowpass'; tone.frequency.value = 3400; tone.Q.value = 0.5;
-    this.gtrBus.connect(shaper).connect(tone).connect(this.musicBus);
+    tone.type = 'lowpass'; tone.frequency.value = 3600; tone.Q.value = 0.4;
+    const body = this.ctx.createBiquadFilter();
+    body.type = 'highpass'; body.frequency.value = 62; body.Q.value = 0.5;
+    this.gtrBus.connect(shaper).connect(tone).connect(body).connect(this.musicBus);
     // lead echo
     this.leadBus = this.ctx.createGain();
     this.leadBus.gain.value = 0.9;
@@ -245,6 +252,31 @@ D.audio = {
       o.start(t); o.stop(t + dur + 0.1);
     }
   },
+  // palm-muted chug: fast bite, quick choke, darkened before the distortion
+  gtrChug(freq, t, dur, vol = 1) {
+    const out = this.ctx.createGain();
+    const choke = D.clamp(dur * 0.8, 0.08, 0.45);
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(0.32 * vol, t + 0.005);
+    out.gain.exponentialRampToValueAtTime(0.0001, t + choke);
+    const mute = this.ctx.createBiquadFilter();
+    mute.type = 'lowpass';
+    mute.frequency.setValueAtTime(1500, t);
+    mute.frequency.exponentialRampToValueAtTime(420, t + choke);
+    out.connect(mute).connect(this.gtrBus);
+    for (const [mult, det, v] of [[1, -3, 1], [1, 3, 1], [0.5, 0, 0.85]]) {
+      const o = this.ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = freq * mult;
+      o.detune.value = det;
+      const g = this.ctx.createGain(); g.gain.value = v;
+      o.connect(g).connect(out);
+      o.start(t); o.stop(t + choke + 0.1);
+    }
+    // pick attack
+    this.noise(t, 0.02, 0.06 * vol, 'highpass', 3200, 1, this.musicBus);
+  },
+
   pluck(freq, t, dur, vol = 1) {
     const o = this.ctx.createOscillator();
     o.type = 'triangle'; o.frequency.value = freq;
@@ -333,36 +365,52 @@ D.audio = {
   intensity: 1,
 
   SONGS: {
-    // E1: HANGAR ASSAULT — fast gallop in E minor
+    // E1: HANGAR ASSAULT — E minor, 16-bar arrangement:
+    // intro build → gallop verse → climbing turn → open-chord chorus with a
+    // harmonized lead → half-time breakdown → fill, and round again.
     e1: {
       bpm: 150,
-      arrange: ['A', 'A', 'B', 'A', 'A', 'B', 'C', 'D'],
+      arrange: ['I', 'I', 'A', 'A', 'B', 'A', 'F', 'C', 'C', 'A', 'A', 'B', 'D', 'D', 'F', 'C'],
       bars: {
+        I: {
+          kick: '1...1...1...1...',
+          hat: 'x...x...x...x.x.',
+          chug: [[0, 'E2', 1], [2, 'E2', 1], [4, 'E2', 1], [6, 'E2', 1], [8, 'E2', 1], [10, 'E2', 1], [12, 'E2', 1], [14, 'E2', 1]],
+          bass: [[0, 'E1', 8], [8, 'E1', 8]],
+        },
         A: {
-          kick: '1...1...1...1...', snare: '....1.......1...',
-          hat: { minInt: 1, p: 'x.x.x.x.x.x.x.x.' },
-          gtr: [[0, 'E2', 1], [2, 'E2', 1], [3, 'E2', 1], [4, 'E2', 1], [6, 'E2', 1], [7, 'E2', 1], [8, 'G2', 2], [10, 'E2', 1], [11, 'E2', 1], [12, 'A2', 2], [14, 'E2', 1], [15, 'E2', 1]],
+          kick: '1...1...1...1..1', snare: '....1.......1...',
+          hat: 'x.x.x.x.x.x.x.x.',
+          chug: [[0, 'E2', 1], [1, 'E2', 1], [2, 'E2', 1], [4, 'E2', 1], [5, 'E2', 1], [6, 'E2', 1], [8, 'E2', 1], [9, 'E2', 1], [10, 'G2', 2], [12, 'E2', 1], [13, 'E2', 1], [14, 'A2', 1], [15, 'Bb2', 1]],
           bass: [[0, 'E1', 4], [4, 'E1', 4], [8, 'G1', 4], [12, 'A1', 4]],
         },
         B: {
-          kick: '1...1...1..11..1', snare: '....1.......1...',
-          hat: { minInt: 1, p: 'x.x.x.x.x.x.x.x.' },
-          gtr: [[0, 'E2', 1], [2, 'E2', 1], [3, 'E2', 1], [4, 'E2', 1], [6, 'E2', 1], [7, 'E2', 1], [8, 'Bb2', 2], [10, 'Bb2', 2], [12, 'A2', 2], [14, 'G2', 2]],
-          bass: [[0, 'E1', 8], [8, 'Bb1', 4], [12, 'A1', 4]],
+          kick: '1...1..1..1.1...', snare: '....1.......1...',
+          hat: 'x.x.x.x.x.x.x.x.',
+          chug: [[0, 'G2', 2], [2, 'G2', 1], [3, 'G2', 1], [4, 'A2', 2], [6, 'A2', 1], [7, 'A2', 1], [8, 'Bb2', 2], [10, 'Bb2', 1], [11, 'Bb2', 1], [12, 'B2', 2], [14, 'D3', 2]],
+          bass: [[0, 'G1', 4], [4, 'A1', 4], [8, 'Bb1', 4], [12, 'B1', 4]],
         },
         C: {
-          kick: '1...1...1...1...', snare: '....1.......1...', crash: '1...............',
-          hat: { minInt: 1, p: 'xxxxxxxxxxxxxxxx' },
-          gtr: [[0, 'E2', 7], [8, 'C3', 7]],
-          lead: { minInt: 1, n: [[0, 'E4', 2], [2, 'G4', 2], [4, 'A4', 4], [8, 'B4', 3], [11, 'D5', 3], [14, 'B4', 2]] },
-          bass: [[0, 'E1', 8], [8, 'C2', 8]],
+          crash: '1...............',
+          kick: '1...1...1...1...', snare: '....1.......1...',
+          hat: { minInt: 1, p: 'x.x.x.x.x.x.x.x.' },
+          gtr: [[0, 'E3', 4], [4, 'D3', 4], [8, 'C3', 4], [12, 'B2', 4]],
+          gtr2: { minInt: 1, n: [[0, 'B3', 4], [4, 'A3', 4], [8, 'G3', 4], [12, 'F#3', 4]] },
+          lead: [[0, 'E4', 3], [3, 'G4', 1], [4, 'F#4', 3], [7, 'A4', 1], [8, 'G4', 3], [11, 'B4', 1], [12, 'D5', 4]],
+          bass: [[0, 'E1', 4], [4, 'D1', 4], [8, 'C1', 4], [12, 'B0', 4]],
         },
         D: {
-          kick: '1...1...1...1...', snare: '....1.......1..1',
-          hat: { minInt: 1, p: 'x.x.x.x.x.x.xxxx' },
-          gtr: [[0, 'E2', 1], [2, 'E2', 1], [3, 'E2', 1], [4, 'G2', 2], [6, 'G2', 1], [7, 'G2', 1], [8, 'A2', 2], [10, 'A2', 1], [11, 'A2', 1], [12, 'Bb2', 2], [14, 'B2', 2]],
-          lead: { minInt: 2, n: [[8, 'E5', 2], [10, 'D5', 2], [12, 'B4', 4]] },
-          bass: [[0, 'E1', 4], [4, 'G1', 4], [8, 'A1', 4], [12, 'B1', 4]],
+          kick: '1.....1.1.......', snare: '........1.......',
+          tom: '............1.1.',
+          chug: [[0, 'E2', 3], [4, 'E2', 1], [6, 'E2', 3], [10, 'E2', 1], [12, 'Bb2', 4]],
+          bass: [[0, 'E1', 8], [8, 'Bb1', 8]],
+          choir: { minInt: 1, n: [[0, ['E2', 'Bb2'], 16]] },
+        },
+        F: {
+          kick: '1.......1.......', snare: '....1..1.1.11111',
+          tom: '......1.1.......',
+          chug: [[0, 'E2', 2], [8, 'E2', 2]],
+          bass: [[0, 'E1', 16]],
         },
       },
     },
@@ -534,7 +582,7 @@ D.audio = {
       const hatP = this.gate(bar.hat);
       if (hatP && hatP[s] === 'x') this.drum('hat', t);
       if (hatP && hatP[s] === 'o') this.drum('ohat', t);
-      for (const [name, fn] of [['gtr', 'gtrNote'], ['bass', 'bassNote'], ['arp', 'pluck']]) {
+      for (const [name, fn] of [['gtr', 'gtrNote'], ['chug', 'gtrChug'], ['gtr2', 'gtrNote'], ['bass', 'bassNote'], ['arp', 'pluck']]) {
         const evs = this.gate(bar[name]);
         if (evs) for (const [st, note, len] of evs) {
           if (st === s) this[fn](this.noteFreq(note), t, len * stepDur);

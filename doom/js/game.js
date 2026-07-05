@@ -285,6 +285,7 @@
     menuIdx: 1, levelIdx: 0, diff: 1,
     menuStage: 'diff', levelSel: 0,
     endless: null, story: null, progress,
+    paused: false,
     player: null, ents: [], doors: {}, map: null,
     boost: 0, shake: 0, redFlash: 0, bonusFlash: 0,
     facePain: 0, faceGrin: 0, msg: '', msgT: 0,
@@ -380,6 +381,20 @@
       this.boost = 0; this.shake = 0; this.redFlash = 0; this.bonusFlash = 0;
       this.msg = ''; this.msgT = 0;
       this.cleared = false;
+      this.paused = false;
+      this.mapLatch = false;
+      // prerender the minimap's static walls (doors drawn live on top)
+      this.miniCv = document.createElement('canvas');
+      this.miniCv.width = this.map.w; this.miniCv.height = this.map.h;
+      const mg2 = this.miniCv.getContext('2d');
+      for (let y = 0; y < this.map.h; y++) {
+        for (let x = 0; x < this.map.w; x++) {
+          const c = this.map.grid[y * this.map.w + x];
+          if (!c) continue;
+          mg2.fillStyle = c === D.tex.EXIT ? '#3ae83a' : 'rgba(196,182,156,0.85)';
+          mg2.fillRect(x, y, 1, 1);
+        }
+      }
       D.input.mouseDX = D.input.mouseDY = 0;
       this.mode = 'level';
       const track = idx < 0
@@ -476,7 +491,16 @@
     },
 
     // ============ update ============
+    togglePause() {
+      if (this.mode !== 'level') return;
+      if (D.net && D.net.role !== 'off') { this.message('no pausing a shared world.'); return; }
+      this.paused = !this.paused;
+      if (D.audio.ctx) { this.paused ? D.audio.ctx.suspend() : D.audio.ctx.resume(); }
+    },
+
     update(dt) {
+      if (this.paused && this.mode === 'level') return;
+      this.paused = false; // leaving level mode always unpauses
       this.time += dt;
       if (this.mode === 'title' || this.mode === 'victory') { fire.update(); this.updateTitle(dt); return; }
       if (this.mode === 'story') { fire.update(); this.updateStory(dt); return; }
@@ -537,7 +561,7 @@
       this.faceGrin = Math.max(0, this.faceGrin - dt);
       this.msgT = Math.max(0, this.msgT - dt);
       this.stats.time += dt;
-      this.automap = inp.map;
+      this.automap = inp.map || this.mapLatch;
 
       // ---- guest client: local aim, remote everything ----
       if (D.net && D.net.role === 'guest') {
@@ -875,6 +899,27 @@
       }
     },
 
+    // what would E do right now? (non-mutating twin of tryUse, for hints)
+    peekUse() {
+      const p = this.player;
+      for (const d of [0.4, 0.7, 1.0, 1.3]) {
+        const tx = p.x + p.dirX * d, ty = p.y + p.dirY * d;
+        if (tx < 0 || ty < 0 || tx >= this.map.w || ty >= this.map.h) break;
+        const idx = (ty | 0) * this.map.w + (tx | 0);
+        const cell = this.map.grid[idx];
+        if (!cell) continue;
+        if (cell === D.tex.EXIT) return { kind: 'exit' };
+        const door = this.doors[idx];
+        if (!door) return null;
+        if (door.kind === 'secret') return null;      // never spoil a secret
+        if (door.kind === 'blue' && !p.keys.blue) return { kind: 'locked', key: 'BLUE' };
+        if (door.kind === 'red' && !p.keys.red) return { kind: 'locked', key: 'RED' };
+        if (door.state === 'closed' || door.state === 'closing') return { kind: 'door' };
+        return null;
+      }
+      return null;
+    },
+
     tryUse() {
       const p = this.player;
       // trace the use ray — first solid cell within reach gets used
@@ -1126,6 +1171,25 @@
         g.fillStyle = 'rgba(255,255,255,0.75)';
         g.fillRect(478, 268, 4, 4);
         g.fillRect(472, 269, 3, 2); g.fillRect(485, 269, 3, 2);
+
+        // context hint: what would USE do right here?
+        const peek = this.peekUse();
+        if (peek) {
+          const useKey = D.touch && D.touch.active ? 'USE' : 'E';
+          let txt, col = '#e8e2d4';
+          if (peek.kind === 'door') txt = `${useKey} — open`;
+          else if (peek.kind === 'exit') { txt = `${useKey} — throw the switch`; col = '#7ce080'; }
+          else if (peek.kind === 'locked') { txt = `locked — find the ${peek.key} keycard`; col = peek.key === 'BLUE' ? '#7a9aff' : '#ff7a6a'; }
+          if (txt) {
+            g.font = 'bold 15px monospace';
+            g.textAlign = 'center'; g.textBaseline = 'middle';
+            const w2 = g.measureText(txt).width + 22;
+            g.fillStyle = 'rgba(8,6,6,0.62)';
+            g.fillRect(480 - w2 / 2, 296, w2, 26);
+            g.fillStyle = col;
+            g.fillText(txt, 480, 309);
+          }
+        }
       }
 
       // message
@@ -1136,8 +1200,30 @@
       }
 
       if (this.automap) this.drawAutomap(g);
+      else this.drawMini(g);
       this.drawHUD(g);
       this.drawTouchUI(g);
+
+      // pause overlay doubles as the controls card
+      if (this.paused) {
+        g.fillStyle = 'rgba(4,3,3,0.72)';
+        g.fillRect(0, 0, 960, 540);
+        this.bigText(g, 'PAUSED', 480, 180, 64, '#e8c93a');
+        const lines = D.touch && D.touch.active ? [
+          'left thumb — walk · right thumb — aim',
+          'FIRE shoots · JMP jumps · USE opens doors & switches',
+          'WPN cycles weapons · MAP toggles the map',
+          '',
+          'tap ❚❚ to resume',
+        ] : [
+          'WASD move · mouse aims · CLICK / CTRL fire',
+          'SPACE jump · C crouch · E use doors & switches',
+          '1-6 weapons · TAB map · N multiplayer',
+          '',
+          'P or ESC to resume',
+        ];
+        lines.forEach((l, i) => this.smallText(g, l, 480, 256 + i * 30, i === lines.length - 1 ? '#e8c93a' : '#cfc4ae'));
+      }
     },
 
     drawTouchUI(g) {
@@ -1216,6 +1302,56 @@
         g.fillStyle = '#e8c93a'; g.textAlign = 'right';
         g.fillText(`${cur}/${mx}`, 940, y0 + 18 + i * 15);
       });
+    },
+
+    // always-on minimap, top-right; tap it (or TAB) for the full map
+    drawMini(g) {
+      const R = D.minimapRect || { x1: 824, y1: 28, x2: 952, y2: 168 };
+      const w = R.x2 - R.x1, h = R.y2 - R.y1;
+      g.fillStyle = 'rgba(10,8,8,0.5)';
+      g.fillRect(R.x1, R.y1, w, h);
+      g.strokeStyle = 'rgba(138,124,100,0.55)';
+      g.lineWidth = 1;
+      g.strokeRect(R.x1 + 0.5, R.y1 + 0.5, w - 1, h - 1);
+      const m = this.map;
+      const availW = w - 8, availH = h - 22;
+      const sc = Math.min(availW / m.w, availH / m.h);
+      const ox = R.x1 + (w - m.w * sc) / 2;
+      const oy = R.y1 + 3 + (availH - m.h * sc) / 2;
+      if (this.miniCv) {
+        const smooth = g.imageSmoothingEnabled;
+        g.imageSmoothingEnabled = false;
+        g.drawImage(this.miniCv, ox, oy, m.w * sc, m.h * sc);
+        g.imageSmoothingEnabled = smooth;
+      }
+      // doors, live (secrets stay disguised as wall)
+      for (const d of Object.values(this.doors)) {
+        if (d.kind === 'secret') continue;
+        g.fillStyle = d.kind === 'blue' ? '#3050c8' : d.kind === 'red' ? '#c02418'
+          : d.open > 0.5 ? 'rgba(184,160,96,0.3)' : '#b8a060';
+        g.fillRect(ox + d.x * sc, oy + d.y * sc, Math.max(sc, 1.5), Math.max(sc, 1.5));
+      }
+      // awake enemies + keycards
+      for (const e of this.ents) {
+        if (e.type === 'enemy' && !e.dead && e.state !== 'sleep') {
+          g.fillStyle = '#e83a28';
+          g.fillRect(ox + e.x * sc - 1, oy + e.y * sc - 1, 2.5, 2.5);
+        } else if (e.type === 'pickup' && (e.kind === 'keyB' || e.kind === 'keyR')) {
+          g.fillStyle = e.kind === 'keyB' ? '#5a80ff' : '#ff5a4a';
+          g.fillRect(ox + e.x * sc - 1, oy + e.y * sc - 1, 2, 2);
+        }
+      }
+      // you
+      const p = this.player;
+      g.save();
+      g.translate(ox + p.x * sc, oy + p.y * sc);
+      g.rotate(Math.atan2(p.dirY, p.dirX));
+      g.fillStyle = '#fff';
+      g.beginPath(); g.moveTo(4.5, 0); g.lineTo(-3, -3); g.lineTo(-3, 3); g.closePath(); g.fill();
+      g.restore();
+      g.font = '10px monospace'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+      g.fillStyle = 'rgba(200,190,160,0.8)';
+      g.fillText(D.touch && D.touch.active ? 'tap — full map' : 'TAB — full map', R.x1 + w / 2, R.y2 - 6);
     },
 
     drawAutomap(g) {

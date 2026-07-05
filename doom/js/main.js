@@ -32,6 +32,10 @@
     if (HOLD[k]) D.input[HOLD[k]] = true;
     if (PRESS[k]) D.input[PRESS[k]] = true;
     if (/^[a-z]$/.test(k)) D.game.cheat(k);
+    if (k === 'p' || k === 'Escape') {
+      const mp = document.getElementById('mpui');
+      if (!(mp && !mp.hidden)) D.game.togglePause();
+    }
     if (HOLD[k] || PRESS[k] || k === 'Tab') e.preventDefault();
   });
   window.addEventListener('keyup', (e) => {
@@ -54,6 +58,7 @@
     D.game.init(cv, g);
 
     cv.addEventListener('mousedown', (e) => {
+      if (D.touch && D.touch.active) return; // touch mode owns the input
       D.audio.ensure();
       if (D.game.mode === 'level' && document.pointerLockElement !== cv) {
         cv.requestPointerLock?.();
@@ -62,7 +67,10 @@
       D.input.firePressed = true;
       e.preventDefault();
     });
-    window.addEventListener('mouseup', () => { D.input.fire = false; });
+    window.addEventListener('mouseup', () => {
+      if (D.touch && D.touch.active) return;
+      D.input.fire = false;
+    });
     window.addEventListener('mousemove', (e) => {
       if (document.pointerLockElement === cv) {
         D.input.mouseDX += e.movementX;
@@ -180,7 +188,10 @@
       if (edge(0)) { i.jumpPressed = true; i.enterPressed = true; i.anyKey = true; }
       if (edge(2) || edge(1)) i.usePressed = true;
       i.crouch = i.crouch || btn(4) || btn(10);
-      if (edge(9)) i.enterPressed = true;
+      if (edge(9)) {
+        if (D.game.mode === 'level') D.game.togglePause();
+        else i.enterPressed = true;
+      }
       if (edge(12)) i.upPressed = true;
       if (edge(13)) i.downPressed = true;
       const cycleWeapon = (dir) => {
@@ -195,6 +206,7 @@
       };
       if (edge(14)) cycleWeapon(-1);
       if (edge(15)) cycleWeapon(1);
+      if (edge(8)) D.game.mapLatch = !D.game.mapLatch; // Select — map
       D.audio.ensure();
     }
     D.cycleWeapon = (dir) => {
@@ -209,68 +221,108 @@
     };
 
     // ---------- touch: twin sticks + buttons ----------
-    D.touch = { active: false, move: null, look: null, buttons: {} };
-    const T = D.touch;
+    // A small state machine, testable without a DOM. Rules that keep it
+    // alive: end/cancel releases EVERY role that finger owned, a re-used
+    // identifier always reclaims cleanly, and synthetic mouse events are
+    // suppressed entirely once touch mode is on.
+    const T = { active: false, move: null, look: null, buttons: {} };
+    D.touch = T;
     const BTNS = [
       { id: 'fire', x: 855, y: 355, r: 52, label: 'FIRE' },
       { id: 'jump', x: 890, y: 245, r: 36, label: 'JMP' },
       { id: 'use', x: 790, y: 265, r: 36, label: 'USE' },
-      { id: 'wpn', x: 905, y: 145, r: 30, label: 'WPN' },
+      { id: 'wpn', x: 740, y: 180, r: 30, label: 'WPN' },
+      { id: 'pause', x: 40, y: 36, r: 26, label: '❚❚' },
     ];
     D.touchButtons = BTNS;
+    // the minimap lives top-right; tapping it opens the full map
+    const MINIMAP = { x1: 824, y1: 28, x2: 952, y2: 168 };
+    D.minimapRect = MINIMAP;
+
+    D.touchCtl = {
+      T, BTNS,
+      start(id, x, y) {
+        T.active = true;
+        this.end(id); // identifier reuse safety: never two roles per finger
+        const btn = BTNS.find(b => D.dist(x, y, b.x, b.y) < b.r + 14);
+        if (btn) {
+          T.buttons[btn.id] = id;
+          if (btn.id === 'fire') { D.input.fire = true; D.input.firePressed = true; }
+          if (btn.id === 'jump') D.input.jumpPressed = true;
+          if (btn.id === 'use') { D.input.usePressed = true; D.input.enterPressed = true; }
+          if (btn.id === 'wpn') D.cycleWeapon(1);
+          if (btn.id === 'pause') D.game.togglePause();
+          return;
+        }
+        if (D.game.mode === 'level' && x >= MINIMAP.x1 && x <= MINIMAP.x2 && y >= MINIMAP.y1 && y <= MINIMAP.y2) {
+          D.game.mapLatch = !D.game.mapLatch;
+          return;
+        }
+        if (x < 420) {
+          T.move = { id, ox: x, oy: y, dx: 0, dy: 0 };
+        } else {
+          T.look = { id, lx: x, ly: y };
+          D.input.enterPressed = true; // menus advance on right-side tap
+        }
+      },
+      moveTo(id, x, y) {
+        if (T.move && id === T.move.id) {
+          T.move.dx = D.clamp((x - T.move.ox) / 55, -1, 1);
+          T.move.dy = D.clamp((y - T.move.oy) / 55, -1, 1);
+        } else if (T.look && id === T.look.id) {
+          D.input.mouseDX += (x - T.look.lx) * 2.4;
+          D.input.mouseDY += (y - T.look.ly) * 2.4;
+          T.look.lx = x; T.look.ly = y;
+        }
+      },
+      end(id) {
+        if (T.move && T.move.id === id) T.move = null;
+        if (T.look && T.look.id === id) T.look = null;
+        for (const b of BTNS) {
+          if (T.buttons[b.id] === id) {
+            delete T.buttons[b.id];
+            if (b.id === 'fire') D.input.fire = false;
+          }
+        }
+      },
+      endAll() {
+        T.move = null; T.look = null;
+        T.buttons = {};
+        D.input.fire = false;
+      },
+    };
+
     function touchPos(t) {
       const r = cv.getBoundingClientRect();
       return { x: (t.clientX - r.left) / r.width * 960, y: (t.clientY - r.top) / r.height * 540 };
     }
     cv.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      T.active = true;
       D.audio.ensure();
       for (const t of e.changedTouches) {
-        const pos = touchPos(t);
-        const btn = BTNS.find(b => D.dist(pos.x, pos.y, b.x, b.y) < b.r + 14);
-        if (btn) {
-          T.buttons[btn.id] = t.identifier;
-          if (btn.id === 'fire') { D.input.fire = true; D.input.firePressed = true; }
-          if (btn.id === 'jump') D.input.jumpPressed = true;
-          if (btn.id === 'use') { D.input.usePressed = true; D.input.enterPressed = true; }
-          if (btn.id === 'wpn') D.cycleWeapon(1);
-        } else if (pos.x < 420) {
-          T.move = { id: t.identifier, ox: pos.x, oy: pos.y, dx: 0, dy: 0 };
-        } else {
-          T.look = { id: t.identifier, lx: pos.x, ly: pos.y };
-          D.input.enterPressed = true; // menus advance on right-side tap
-        }
+        const p = touchPos(t);
+        D.touchCtl.start(t.identifier, p.x, p.y);
       }
     }, { passive: false });
     cv.addEventListener('touchmove', (e) => {
       e.preventDefault();
       for (const t of e.changedTouches) {
-        const pos = touchPos(t);
-        if (T.move && t.identifier === T.move.id) {
-          T.move.dx = D.clamp((pos.x - T.move.ox) / 55, -1, 1);
-          T.move.dy = D.clamp((pos.y - T.move.oy) / 55, -1, 1);
-        } else if (T.look && t.identifier === T.look.id) {
-          D.input.mouseDX += (pos.x - T.look.lx) * 2.4;
-          D.input.mouseDY += (pos.y - T.look.ly) * 2.4;
-          T.look.lx = pos.x; T.look.ly = pos.y;
-        }
+        const p = touchPos(t);
+        D.touchCtl.moveTo(t.identifier, p.x, p.y);
       }
     }, { passive: false });
     const touchEnd = (e) => {
-      for (const t of e.changedTouches) {
-        if (T.move && t.identifier === T.move.id) T.move = null;
-        if (T.look && t.identifier === T.look.id) T.look = null;
-        for (const b of BTNS) {
-          if (T.buttons[b.id] === t.identifier) {
-            delete T.buttons[b.id];
-            if (b.id === 'fire') D.input.fire = false;
-          }
-        }
+      // preventDefault kills the synthetic mousedown/click that follows a
+      // tap — those were reaching the desktop handlers (pointer lock, fire)
+      e.preventDefault();
+      for (const t of e.changedTouches) D.touchCtl.end(t.identifier);
+      if (e.touches && e.touches.length === 0) {
+        // nothing is on the glass: drop any role a missed event stranded
+        D.touchCtl.endAll();
       }
     };
-    cv.addEventListener('touchend', touchEnd);
-    cv.addEventListener('touchcancel', touchEnd);
+    cv.addEventListener('touchend', touchEnd, { passive: false });
+    cv.addEventListener('touchcancel', touchEnd, { passive: false });
     function applyTouch() {
       if (!T.active || !T.move) return;
       const i = D.input;

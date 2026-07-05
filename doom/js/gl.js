@@ -61,14 +61,21 @@
 
     buildSpriteAtlas() {
       const gl = this.gl;
-      // shelf-pack every baked sprite into 1024x1024
-      const A = 1024;
+      // shelf-pack every baked sprite. 1024 overflowed once the bestiary
+      // grew (silent OOB writes = invisible/garbage sprites), so size the
+      // atlas to the content and refuse to pack past the edge.
+      const A = 2048;
       const data = new Uint8Array(A * A * 4);
       this.sprUV = {};
-      let cx = 0, cy = 0, rowH = 0;
+      let cx = 0, cy = 0, rowH = 0, dropped = 0;
       for (const [name, spr] of Object.entries(D.sprites.all)) {
         if (cx + spr.w + 2 > A) { cx = 0; cy += rowH + 2; rowH = 0; }
         rowH = Math.max(rowH, spr.h);
+        if (cy + spr.h > A) {
+          // never write out of bounds; a missing sprite beats a corrupt one
+          dropped++;
+          continue;
+        }
         for (let y = 0; y < spr.h; y++) {
           for (let x = 0; x < spr.w; x++) {
             const s = (y * spr.w + x) * 4, d = ((cy + y) * A + cx + x) * 4;
@@ -79,6 +86,7 @@
         this.sprUV[name] = [cx / A, cy / A, spr.w / A, spr.h / A];
         cx += spr.w + 2;
       }
+      if (dropped) console.error(`DOOMED: sprite atlas overflow — ${dropped} sprites dropped; raise atlas size`);
       this.spriteTex = this.makeTex(A, A, data, gl.NEAREST);
     },
 
