@@ -1,0 +1,9 @@
+{
+  "name": "roadwrath",
+  "private": true,
+  "type": "module",
+  "description": "ROAD WRATH — a Road Rash-style motorcycle combat racer. Static ES modules, no build step. Three.js vendored in vendor/three.",
+  "scripts": {
+    "test": "node --test test/"
+  }
+}

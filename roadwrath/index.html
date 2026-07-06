@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROAD WRATH</title>
+<meta name="description" content="A Road Rash-style motorcycle combat racer. Punch, kick, and race your way up five levels of golden-hour California. Procedural everything; Three.js vendored, zero other dependencies.">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/addons/"
+  }
+}
+</script>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  <div id="hud" hidden></div>
+  <div id="screens"></div>
+  <div id="fps" hidden></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
