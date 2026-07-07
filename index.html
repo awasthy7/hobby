@@ -48,20 +48,39 @@
     padding: clamp(24px, 5vw, 64px) clamp(16px, 4vw, 40px) 80px;
   }
 
-  /* ---------- boot header ---------- */
-  header {
-    border-bottom: 1px solid var(--line);
-    padding-bottom: 28px;
-    margin-bottom: 8px;
+  /* ---------- splash screen (boot log over matrix rain, then fades) ------- */
+  .splash {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: var(--void);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    opacity: 1;
+    transition: opacity 0.7s ease;
   }
-
+  .splash.gone {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .splash .rain {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.5;
+  }
   .boot {
+    position: relative;
+    z-index: 1;
+    margin: 0;
     color: var(--sys);
-    font-size: 12.5px;
-    line-height: 1.9;
+    font: 13px/1.9 ui-monospace, "Cascadia Code", "Menlo", "Consolas", monospace;
     letter-spacing: 0.02em;
-    min-height: 90px;
-    white-space: pre-wrap;
+    white-space: pre;
+    text-shadow: 0 0 8px rgba(106,138,110,0.5);
+    padding: 0 16px;
   }
   .boot .ok { color: var(--bone-dim); }
   .cursor {
@@ -73,6 +92,19 @@
     animation: blink 1s steps(1) infinite;
   }
   @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---------- header ---------- */
+  header {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 28px;
+    margin-bottom: 8px;
+  }
+  /* content starts revealed once the splash lifts */
+  .wrap { opacity: 0; transition: opacity 0.5s ease 0.15s; }
+  .wrap.lit { opacity: 1; }
+  /* safety: if JS never runs (or is disabled), still show the page + hide splash */
+  .no-js .wrap { opacity: 1; }
+  .no-js .splash { display: none; }
 
   h1 {
     font-size: clamp(38px, 9vw, 88px);
@@ -128,50 +160,52 @@
   }
 
   .games {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
   }
 
   .game {
-    display: grid;
-    grid-template-columns: 132px 1fr;
-    gap: 0;
+    display: flex;
+    flex-direction: column;
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 3px;
+    border-radius: 4px;
     overflow: hidden;
-    transition: border-color 0.18s, transform 0.18s;
+    transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
     position: relative;
   }
   .game::before {
     content: "";
     position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 3px;
+    left: 0; top: 0; right: 0;
+    height: 3px;
     background: var(--accent);
     opacity: 0.9;
+    z-index: 1;
   }
   .game:hover {
     border-color: var(--accent);
-    transform: translateX(3px);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   }
 
   .thumb {
     position: relative;
     background: #060608;
-    border-right: 1px solid var(--line);
-    aspect-ratio: 1 / 1;
+    border-bottom: 1px solid var(--line);
+    aspect-ratio: 16 / 9;
     overflow: hidden;
   }
   .thumb canvas { display: block; width: 100%; height: 100%; }
 
   .meta {
-    padding: 16px 20px 18px;
+    padding: 15px 18px 18px;
     display: flex;
     flex-direction: column;
     gap: 8px;
     min-width: 0;
+    flex: 1;
   }
   .titleline {
     display: flex;
@@ -194,9 +228,13 @@
   }
   .desc {
     color: var(--bone-dim);
-    font-size: 13.5px;
+    font-size: 13px;
     line-height: 1.5;
-    max-width: 66ch;
+    /* clamp long descriptions so tiles stay a consistent, scannable height */
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
   .desc em { color: var(--bone); font-style: normal; }
 
@@ -215,7 +253,8 @@
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-top: 8px;
+    margin-top: auto;
+    padding-top: 6px;
   }
   .links a {
     font-family: inherit;
@@ -257,22 +296,28 @@
   footer a:hover { border-bottom-color: var(--sys); }
   footer .prompt { color: var(--hell); }
 
-  @media (max-width: 560px) {
-    .game { grid-template-columns: 92px 1fr; }
+  @media (max-width: 460px) {
+    .games { grid-template-columns: 1fr; }
     .meta { padding: 13px 15px 15px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .cursor { animation: none; }
+    .splash { transition: none; }
+    .wrap { transition: none; }
     .game { transition: border-color 0.18s; }
-    .game:hover { transform: none; }
+    .game:hover { transform: none; box-shadow: none; }
   }
 </style>
 </head>
-<body>
+<body class="no-js">
+<script>document.body.classList.remove("no-js");</script>
+<div class="splash" id="splash" aria-hidden="true">
+  <canvas class="rain" id="rain"></canvas>
+  <pre class="boot" id="boot"></pre>
+</div>
 <div class="wrap">
   <header>
-    <div class="boot" id="boot" aria-hidden="true"></div>
     <h1>HOBBY<span class="sys">.SYS</span></h1>
     <p class="tag">Six games for the browser, built by hand in JavaScript over a couple of weekends. <b>No engines. No frameworks. No image or audio files. No build step.</b> Every texture, every sound, every world is generated in code the moment the page loads. The newest one bends a single rule — it vendors Three.js — and makes everything else itself.</p>
     <div class="creed">
@@ -302,7 +347,11 @@
   "use strict";
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // ---------- boot sequence ----------
+  // ---------- splash: matrix rain + boot log, then lift to reveal the page ----
+  const splash = document.getElementById("splash");
+  const wrapEl = document.querySelector(".wrap");
+  const bootEl = document.getElementById("boot");
+
   const bootLines = [
     ["HOBBY.SYS v1.0 — cold boot", "ok"],
     ["checking canvas2d .......... PRESENT", "ok"],
@@ -312,27 +361,78 @@
     ["loading assets ............ 0 found  (none needed)", ""],
     ["mounting /games ........... 6 titles", ""],
   ];
-  const bootEl = document.getElementById("boot");
+
+  let lifted = false;
+  function lift() {
+    if (lifted) return;
+    lifted = true;
+    splash.classList.add("gone");
+    wrapEl.classList.add("lit");
+    setTimeout(() => { if (splash.parentNode) splash.remove(); }, 800);
+  }
+  // hard safety net: never leave the splash covering the page
+  setTimeout(lift, 4000);
+
+  // matrix glyph rain behind the boot log (runs until the splash lifts)
+  let rainRAF = 0;
+  (function rain() {
+    const cv = document.getElementById("rain");
+    const g = cv.getContext("2d");
+    let cols, drops, cw = 0, ch = 0;
+    const GLYPHS = "01<>[]{}/\\|=+*·ハミヒキラモナ日ロ";
+    const size = 14;
+    const resize = () => {
+      cw = cv.width = innerWidth; ch = cv.height = innerHeight;
+      cols = Math.ceil(cw / size);
+      drops = Array.from({ length: cols }, () => Math.random() * -ch);
+    };
+    resize();
+    addEventListener("resize", resize);
+    let last = 0;
+    const step = (now) => {
+      if (now - last > 45) {                       // ~22fps, that classic choppy fall
+        last = now;
+        g.fillStyle = "rgba(10,10,13,0.28)";
+        g.fillRect(0, 0, cw, ch);
+        g.font = size + "px monospace";
+        for (let i = 0; i < cols; i++) {
+          const ch2 = GLYPHS[(Math.random() * GLYPHS.length) | 0];
+          const x = i * size, y = drops[i];
+          g.fillStyle = "rgba(200,232,204,0.9)";   // bright leading glyph
+          g.fillText(ch2, x, y);
+          g.fillStyle = "rgba(106,138,110,0.55)";  // trailing tint
+          g.fillText(GLYPHS[(Math.random() * GLYPHS.length) | 0], x, y - size);
+          drops[i] = y > ch && Math.random() > 0.975 ? 0 : y + size;
+        }
+      }
+      rainRAF = requestAnimationFrame(step);
+    };
+    rainRAF = requestAnimationFrame(step);
+  })();
+
   if (reduced) {
-    bootEl.textContent = bootLines.map(l => l[0]).join("\n") + "\n> ready_";
+    bootEl.innerHTML = bootLines.map(l => l[0]).join("\n") +
+      '\n<span style="color:var(--hell)">&gt; ready_</span>';
+    setTimeout(() => { cancelAnimationFrame(rainRAF); lift(); }, 600);
   } else {
     let li = 0, ci = 0, out = "";
     const tick = () => {
       if (li >= bootLines.length) {
         bootEl.innerHTML = out + '<span style="color:var(--hell)">&gt; ready_</span> <span class="cursor"></span>';
+        setTimeout(() => { cancelAnimationFrame(rainRAF); lift(); }, 650);
         return;
       }
       const line = bootLines[li][0];
       if (ci < line.length) {
         out += line[ci++];
-        bootEl.textContent = out;
-        setTimeout(tick, 6 + Math.random() * 10);
+        bootEl.innerHTML = out.replace(/</g, "&lt;");
+        setTimeout(tick, 5 + Math.random() * 9);
       } else {
         const cls = bootLines[li][1] === "ok" ? ' <span class="ok">[ done ]</span>' : "";
         out += cls + "\n";
         li++; ci = 0;
         bootEl.innerHTML = out;
-        setTimeout(tick, 55);
+        setTimeout(tick, 48);
       }
     };
     tick();
@@ -392,7 +492,7 @@
     el.className = "game";
     el.style.setProperty("--accent", gme.accent);
     const cv = document.createElement("canvas");
-    cv.width = 128; cv.height = 128;
+    cv.width = 256; cv.height = 144;              // 16:9 to match the tile thumb
     canvases.push({ cv, render: gme.render, t: Math.random() * 100 });
     const thumb = document.createElement("div");
     thumb.className = "thumb";
@@ -580,14 +680,14 @@
   }
 
   // ---------- animate thumbnails (only while on screen) ----------
-  const ctxs = canvases.map(c => ({ g: c.cv.getContext("2d"), render: c.render, t: c.t, on: true }));
+  const ctxs = canvases.map(c => ({ g: c.cv.getContext("2d"), render: c.render, t: c.t, on: true, w: c.cv.width, h: c.cv.height }));
   if (reduced) {
     // one static frame each
-    ctxs.forEach(c => { for (let k=0;k<40;k++){ c.t+=0.04; c.render(c.g, 128, 128, c.t); } });
+    ctxs.forEach(c => { for (let k=0;k<40;k++){ c.t+=0.04; c.render(c.g, c.w, c.h, c.t); } });
   } else {
     let raf;
     const loop = () => {
-      for (const c of ctxs) if (c.on) { c.t += 0.03; c.render(c.g, 128, 128, c.t); }
+      for (const c of ctxs) if (c.on) { c.t += 0.03; c.render(c.g, c.w, c.h, c.t); }
       raf = requestAnimationFrame(loop);
     };
     // pause when tab hidden to save battery
